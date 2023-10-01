@@ -12,7 +12,6 @@ def read_events(events):
                      'current': i[2],
                      'merge':i[3],
                      }
-        
     return out
 
 
@@ -83,7 +82,6 @@ def split_time(events):
 
 
 def mig_add(nodes, events):
-
     t_1 = split_time(events)
     t_2 = split_time(events)
     t_from = min(t_1,t_2)
@@ -133,47 +131,82 @@ def mig_add(nodes, events):
 
     ##This is the case that the end of migration is before the root of the tree.
     else:
-        c_pa = nodes[p_to]['parents']
-        c_chi = [new_a, p_to]
-        b_pa = nodes[p_from]['parents']
+        if p_to != p_from:
 
-        ##Update the nodes
-        nodes[p_to]['parents'] = [new_c]
-        nodes[p_from]['parents'] = [new_a,new_b]
-        for x in c_pa:
-            nodes[x]['children'].remove(p_to)
-            nodes[x]['children'].append(new_c)
-        for x in b_pa:
-            nodes[x]['children'].remove(p_from)
-            nodes[x]['children'].append(new_b)
+            c_pa = nodes[p_to]['parents']
+            c_chi = [new_a, p_to]
+            b_pa = nodes[p_from]['parents']
 
-        nodes[new_a] = {
-        'parents':new_c,
-        'children':[p_from],
-        'time':t_from,
-        'frac':f
-        }
-        nodes[new_b] = {
-        'parents':b_pa,
-        'children':[p_from],
-        'time':t_from,
-        'frac':1-f
-        }
-        nodes[new_c] = {
-        'parents':c_pa,
-        'children':c_chi,
-        'time':t_to,
-        'frac':1
-        }
-        ##Update the events
-        events.insert(t_to_index,[new_c,t_to,[],1])
-        events.insert(t_from_index,[new_b,t_from,[],0])
-        events.insert(t_from_index,[new_a,t_from,[],0])
-        for i in range(t_from_index,len(events)):
-            events[i][2] = [x for x in events[i-1][2] if x not in nodes[events[i][0]]['children']]+[events[i][0]]
-            if events[i][1] == events[i-1][1]:
-                events[i-1][2].append(events[i][0])
-            events[i][2] = list(set(events[i][2]))
+            ##Update the nodes
+            nodes[p_to]['parents'] = [new_c]
+            nodes[p_from]['parents'] = [new_a,new_b]
+            if len(c_pa)>0:
+                for x in c_pa:
+                    nodes[x]['children'].remove(p_to)
+                    nodes[x]['children'].append(new_c)
+            if len(b_pa)>0:
+                for x in b_pa:
+                    nodes[x]['children'].remove(p_from)
+                    nodes[x]['children'].append(new_b)
+            nodes[new_a] = {
+            'parents':[new_c],
+            'children':[p_from],
+            'time':t_from,
+            'frac':f
+            }
+            nodes[new_b] = {
+            'parents':b_pa,
+            'children':[p_from],
+            'time':t_from,
+            'frac':1-f
+            }
+            nodes[new_c] = {
+            'parents':c_pa,
+            'children':c_chi,
+            'time':t_to,
+            'frac':1
+            }
+            ##Update the events
+            events.insert(t_to_index,[new_c,t_to,[],1])
+            events.insert(t_from_index,[new_b,t_from,[],0])
+            events.insert(t_from_index,[new_a,t_from,[],0])
+            for i in range(t_from_index,len(events)):
+                events[i][2] = [x for x in events[i-1][2] if x not in nodes[events[i][0]]['children']]+[events[i][0]]
+                if events[i][1] == events[i-1][1]:
+                    events[i-1][2].append(events[i][0])
+                events[i][2] = list(set(events[i][2]))
+        else:
+            c_pa = nodes[p_to]['parents']
+            nodes[p_from]['parents'] = [new_a,new_b]
+            for x in c_pa:
+                nodes[x]['children'].remove(p_to)
+                nodes[x]['children'].append(new_c)
+
+            nodes[new_a] = {
+            'parents':[new_c],
+            'children':[p_from],
+            'time':t_from,
+            'frac':f
+            }
+            nodes[new_b] = {
+            'parents':[new_c],
+            'children':[p_from],
+            'time':t_from,
+            'frac':1-f
+            }
+            nodes[new_c] = {
+            'parents':c_pa,
+            'children':[new_a,new_b],
+            'time':t_to,
+            'frac':1
+            }
+            events.insert(t_to_index,[new_c,t_to,[],1])
+            events.insert(t_from_index,[new_b,t_from,[],0])
+            events.insert(t_from_index,[new_a,t_from,[],0])
+            for i in range(t_from_index,len(events)):
+                events[i][2] = [x for x in events[i-1][2] if x not in nodes[events[i][0]]['children']]+[events[i][0]]
+                if events[i][1] == events[i-1][1]:
+                    events[i-1][2].append(events[i][0])
+                events[i][2] = list(set(events[i][2]))
 
     return nodes, events
-
