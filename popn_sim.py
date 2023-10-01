@@ -210,3 +210,64 @@ def mig_add(nodes, events):
                 events[i][2] = list(set(events[i][2]))
 
     return nodes, events
+
+
+    def mig_remove(nodes, events):
+    ##select all the migration branches
+    l = [x for x in events if x[-1]==0]
+    p_remove = random.sample(l,1)[0][0]
+    #select all the migration branches that removed
+    mig_remove = []
+    pend = [p_remove]
+    margin = nodes[nodes[p_remove]['children'][0]]['parents']
+    margin.remove(p_remove)
+    mig_count = 1
+    while  len(pend)!= 0:
+        a = pend.pop()
+        mig_remove.append(a)
+        ll = nodes[a]['parents']
+        if len(ll) == 2:
+            pend = pend + ll
+            mig_count += 1
+        if len(ll) == 1:
+            bran = ll[0]
+            if bran in margin:
+                pend.append(bran)
+                margin.remove(bran)
+            else:
+                margin.append(bran)
+    for i in list(nodes.keys()):
+        if i in mig_remove:
+            del nodes[i]
+        else:
+            nodes[i]['parents'] = [x for x in nodes[i]['parents'] if x not in mig_remove]
+            nodes[i]['children'] = [x for x in nodes[i]['children'] if x not in mig_remove]
+    total_remove = mig_remove.copy() + margin.copy()
+    lmargin = margin.copy()
+    while len(margin)!= 0:
+        ##Note that margin can only have one children
+        m = margin.pop()
+        pa = nodes[m]['parents']
+        while nodes[m]['children'][0] in margin:
+            m = nodes[m]['children'][0]
+            margin.remove(m)
+        for x in pa:
+            nodes[x]['children'] = nodes[x]['children'] + nodes[m]['children']
+        nodes[nodes[m]['children'][0]]['parents'] = pa
+    for i in list(nodes.keys()):
+        if i in lmargin:
+            del nodes[i]
+        else:
+            nodes[i]['parents'] = [x for x in nodes[i]['parents'] if x not in lmargin]
+            nodes[i]['children'] = [x for x in nodes[i]['children'] if x not in lmargin]
+    events = [x for x in events if x[0] not in total_remove]
+    for i in range(1,len(events)):
+            events[i][2] = [x for x in events[i-1][2] if x not in nodes[events[i][0]]['children']]+[events[i][0]]
+            if events[i][1] == events[i-1][1]:
+                events[i-1][2].append(events[i][0])
+            events[i][2] = list(set(events[i][2]))
+    for i in range(mig_count-1):
+         nodes, events = mig_add(nodes, events)
+         
+    
+    return nodes, events
