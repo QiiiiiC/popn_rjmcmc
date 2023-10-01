@@ -75,7 +75,7 @@ def split_time(events):
         wait = expon.rvs(scale = math.comb(n,2), size = 1)[0]
         t += wait
         i += 1
-    if i == len(events)-1:
+    if (i == len(events)-1) & (t>events[-1][1]):
         t = events[-1][1]+ expon.rvs(1, size = 1)[0]
 
     return t
