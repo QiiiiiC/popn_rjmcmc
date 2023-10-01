@@ -212,7 +212,7 @@ def mig_add(nodes, events):
     return nodes, events
 
 
-    def mig_remove(nodes, events):
+def mig_remove(nodes, events):
     ##select all the migration branches
     l = [x for x in events if x[-1]==0]
     p_remove = random.sample(l,1)[0][0]
