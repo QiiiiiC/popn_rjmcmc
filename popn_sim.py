@@ -47,7 +47,7 @@ def popn_create(n=4):
     t = 0
     events = [[0, 0,[i for i in range(1,n+1)],1]]
     while len(current)!=1:
-        wait = expon.rvs(scale = math.comb(len(current),2), size = 1)[0]
+        wait = expon.rvs(scale = 1/(math.comb(len(current),2)), size = 1)[0]
         t += wait
         m = random.sample(current, 2)
         new = len(nodes)+1
@@ -66,13 +66,12 @@ def popn_create(n=4):
     return nodes,events
 
 
-def split_time(events):
-    i = 0
-    t = 0
+def split_time(events, i=0):
+    t = events[i][1]
     while (t>=events[i][1]) & (i<len(events)-1):
         n = len(events[i][2])
         t = events[i][1]
-        wait = expon.rvs(scale = math.comb(n,2), size = 1)[0]
+        wait = expon.rvs(scale = 1/(math.comb(n,2)), size = 1)[0]
         t += wait
         i += 1
     if (i == len(events)-1) & (t>events[-1][1]):
@@ -272,23 +271,53 @@ def mig_remove(nodes, events):
     
     return nodes, events
 
-    def prior_likelihood(events, rho):
-        prod = 1
-        for i in range(1,len(events)):
-            if events[i][1] == events[i-1][1]:
+def mig_resample(nodes, events):
+    l = [x for x in range(1,len(events)-1)]
+    r = random.sample(l,1)[0]
+    rewire = events[r][0]
+    
+    if len(nodes[rewire]['parents']) == len(nodes[rewire]['parents']):
+        forward_propose = 1
+        backward_propose = 1
+        return nodes, events, forward_propose, backward_propose
+    elif len(nodes[rewire]['parents']) == 1:
+        t_end = split_time(r,events)
+        t_start = nodes[rewire]['time']
+    else:
+
+    return nodes, events,forward_propose, backward_propose
+
+
+
+def prior_likelihood(events, rho):
+    prod = 1
+    for i in range(1,len(events)):
+        if events[i][1] == events[i-1][1]:
                 prod *= 1
-            else:
-                rate = math.comb(len(events[i][2]),2) + rho * len(events[i][2])/2
-                if events[i][-1] == 1:
-                    prod *= math.exp(rate)
-                else :
-                    prod *= math.exp(rate)
-                    prod *= rho/2
-        return prod
+        else:
+            rate = math.comb(len(events[i][2]),2) + rho * len(events[i][2])/2
+            if events[i][-1] == 1:
+                prod *= math.exp(rate)
+            else :
+                prod *= math.exp(rate)
+                prod *= rho/2
+    return prod
 
 
-    def mig_rjmcmc(nodes, evnets):
-        l = [x for x in events if x[-1]==0]
-        ## n is the numer of migration events
-        n = l/2
-        ## with probability 1/(n+1) we add an events
+def mig_rjmcmc(nodes, events):
+    old_nodes = nodes.copy()
+    old_events = events.copy()
+
+    l = [x for x in events if x[-1]==0]
+    ## n is the numer of migration events
+    n = l/2
+
+    ## with probability 1/4 we add an events, 1/4 we remove an events, and 1/2 resample the coalescent
+    ## when there's no events, add events with 1/2 and resample with 1/2
+    u = random.uniform(0,1)
+    if n == 0:
+        if u<1/2:
+            nodes, events, propose = mig_resample(nodes, events)
+        else:
+            nodes, events = mig_add(nodes, events)
+    

@@ -21,7 +21,7 @@ def true_prior(n=4, rho=0.2):
     t = 0
     events = [[0, 0,[i for i in range(1,n+1)],1]]
     while len(current)!=1:
-        wait = expon.rvs(scale = (math.comb(len(current),2) + rho*len(current)/2), size = 1)[0]
+        wait = expon.rvs(scale = 1/(math.comb(len(current),2) + rho*len(current)/2), size = 1)[0]
         t += wait
         prob = random.uniform(0,1)
         banch = (len(current)-1)/(len(current)-1+rho)
