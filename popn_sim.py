@@ -271,3 +271,24 @@ def mig_remove(nodes, events):
          
     
     return nodes, events
+
+    def prior_likelihood(events, rho):
+        prod = 1
+        for i in range(1,len(events)):
+            if events[i][1] == events[i-1][1]:
+                prod *= 1
+            else：
+                rate = math.comb(len(events[i][2]),2) + rho * len(events[i][2])/2
+                if events[i][-1] == 1:
+                    prod *= math.exp(rate)
+                else :
+                    prod *= math.exp(rate)
+                    prod *= rho/2
+        return prod
+
+
+    def mig_rjmcmc(nodes, evnets):
+        l = [x for x in events if x[-1]==0]
+        ## n is the numer of migration events
+        n = l/2
+        ## with probability 1/(n+1) we add an events
