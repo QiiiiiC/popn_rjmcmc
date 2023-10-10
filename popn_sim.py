@@ -277,7 +277,7 @@ def mig_remove(nodes, events):
         for i in range(1,len(events)):
             if events[i][1] == events[i-1][1]:
                 prod *= 1
-            else：
+            else:
                 rate = math.comb(len(events[i][2]),2) + rho * len(events[i][2])/2
                 if events[i][-1] == 1:
                     prod *= math.exp(rate)
