@@ -297,7 +297,7 @@ def mig_remove(nodes, events):
                 events[i-1][2].append(events[i][0])
             events[i][2] = list(set(events[i][2]))
     for i in range(mig_count-1):
-         nodes, events = mig_add(nodes, events)
+         nodes, events, r = mig_add(nodes, events)
          
     
     return nodes, events
@@ -556,16 +556,6 @@ def mig_rjmcmc(nodes, events):
         if u<1/2:
             nodes, events, propose = mig_resample(nodes, events)
         else:
-            nodes, events = mig_add(nodes, events)
+            nodes, events, r = mig_add(nodes, events)
     
 
-
-
-
-nodes, events = popn_create()
-for i in range(2):
-    nodes, events = mig_add(nodes, events)
-
-for i in range(100):
-    nodes, events, f, b = mig_resample(nodes, events)
-[x for x in events ]
