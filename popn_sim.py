@@ -66,33 +66,64 @@ def popn_create(n=4):
     return nodes,events
 
 
-def split_time(events, i=0):
-    t = events[i][1]
-    while (t>=events[i][1]) & (i<len(events)-1):
-        n = len(events[i][2])
-        t = events[i][1]
-        wait = expon.rvs(scale = 1/(math.comb(n,2)), size = 1)[0]
-        t += wait
-        i += 1
-    if (i == len(events)-1) & (t>events[-1][1]):
+def split_time(events, t_start=0):
+    start = timeindex(events, t_start)
+    if start > 0:
+        t = start + expon.rvs(scale = 1/(math.comb(len(events[start-1][2]), 2)), size = 1)[0]
+    else:
+        t = start + expon.rvs(scale = 1/(math.comb(len(events[start][2]), 2)), size = 1)[0]
+
+    while (t>=events[start][1]) & (start<len(events)-1):
+        if events[start][1] == events[start+1][1]:
+            start += 1
+        else:
+            n = len(events[start][2])
+            t = events[start][1]
+            wait = expon.rvs(scale = 1/(math.comb(n,2)), size = 1)[0]
+            t += wait
+            start += 1
+    if (start == len(events)-1) & (start>events[-1][1]):
         t = events[-1][1]+ expon.rvs(1, size = 1)[0]
 
     return t
 
 
+def total_length(events):
+    total = [0]
+    for i in range(len(events)-1):
+        if events[i][1] != events[i+1][1]:
+            total.append(total[-1] + len(events[i][2])*(events[i+1][1]-events[i][1]))
+        else:
+            total.append(total[-1])
+
+    return total[-1]
+
+
+def choose_uniform(events):
+    total = [0]
+    for i in range(len(events)-1):
+        if events[i][1] != events[i+1][1]:
+            total.append(total[-1] + len(events[i][2])*(events[i+1][1]-events[i][1]))
+        else:
+            total.append(total[-1])
+    u = random.uniform(0, total[-1])
+    i = 0
+    while u > total[i]:
+        i += 1
+    out = random.sample(events[i-1][2],1)[0]
+    t = (u - total[i-1])/(len(events[i-1][2])) + events[i-1][1]
+    return t, out
+    
+
+
+
 def mig_add(nodes, events):
-    t_1 = split_time(events)
-    t_2 = split_time(events)
-    t_from = min(t_1,t_2)
-    t_to = max(t_1,t_2)
+    t_from, p_from = choose_uniform(events)
+    t_to = split_time(events, t_from)
     t_from_index = timeindex(events,t_from)
     t_to_index = timeindex(events,t_to)
+    rjmcmc_ratio = 1/total_length(events) 
 
-    ##t_from_index is the order index in events.
-    if t_from_index == len(events):
-        p_from = events[-1][0]
-    else:
-        p_from = random.sample(events[t_from_index-1][2],1)[0]
     if t_to_index == len(events):
         p_to = events[-1][0]
     else:
@@ -208,7 +239,7 @@ def mig_add(nodes, events):
                     events[i-1][2].append(events[i][0])
                 events[i][2] = list(set(events[i][2]))
 
-    return nodes, events
+    return nodes, events, rjmcmc_ratio
 
 
 def mig_remove(nodes, events):
@@ -531,10 +562,10 @@ def mig_rjmcmc(nodes, events):
 
 
 
-
+nodes, events = popn_create()
 for i in range(2):
     nodes, events = mig_add(nodes, events)
-nodes, events = popn_create()
+
 for i in range(100):
     nodes, events, f, b = mig_resample(nodes, events)
-nodes
+[x for x in events ]
