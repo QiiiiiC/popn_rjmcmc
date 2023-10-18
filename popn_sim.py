@@ -271,22 +271,228 @@ def mig_remove(nodes, events):
     
     return nodes, events
 
+
+def find_current(events, t):
+    i = 0
+    while (t > events[i][1]) & (i < len(events)):
+        i += 1
+    if i == len(events):
+        return events[-1][2]
+    else:
+        return events[i-1][2]
+
+
 def mig_resample(nodes, events):
     l = [x for x in range(1,len(events)-1)]
     r = random.sample(l,1)[0]
     rewire = events[r][0]
+
+    forward_propose = 1
+    backward_propose = 1
     
     if len(nodes[rewire]['parents']) == len(nodes[rewire]['parents']):
+        ##In this case the rewire has two parents and two children so we do nothing
+
         forward_propose = 1
         backward_propose = 1
         return nodes, events, forward_propose, backward_propose
+    
     elif len(nodes[rewire]['parents']) == 1:
-        t_end = split_time(r,events)
+        ##In this case the rewire has one parent then two children, so we reiwre upwards from the birth of rewire
+
         t_start = nodes[rewire]['time']
+        t_end = random.uniform(t_start, events[-1][1])
+        
+        if t_end < events[-1][1]:
+            ##In this case the root does not change
+
+            end_index = timeindex(events, t_end)
+            pa = nodes[rewire]['parents'][0]
+            original_t = nodes[pa]['time']
+            if t_end < original_t:
+                p_end = random.sample([x for x in find_current(events,t_end) if x != rewire],1)[0]
+                forward_propose *= 1/(len(find_current(events, t_end))-1)
+            else:
+                p_end = random.sample(find_current(events, t_end),1)[0]
+                forward_propose *= 1/len(find_current(events, t_end))
+
+            if p_end != pa:
+                ##In this case the topology changed
+
+                if pa == events[-1][0]:
+                    ##In this case the parents of rewire is not the root
+
+                    grandpa = nodes[pa]['parents']
+                    otherchi = [x for x in nodes[pa]['children'] if x != rewire][0]
+                    
+                    nodes[otherchi]['parents'] = grandpa
+                    for x in grandpa:
+                        nodes[x]['children'] = [x for x in nodes[x]['children'] if x != pa] + [otherchi]
+                    nodes[pa]['children'] = [rewire, p_end]
+                    nodes[pa]['parents'] = nodes[p_end]['parents']
+                    for x in nodes[p_end]['parents']:
+                        nodes[x]['children'] = [x for x in nodes[x]['children'] if x != p_end] + [pa]
+                    nodes[pa]['time'] = t_end
+                    nodes[p_end]['parents'] = [pa]
+
+                    del events[timeindex(events,original_t)]
+                    if t_end < original_t:
+                        events.insert(end_index,[pa,t_end,[],1])
+                    else:
+                        events.insert(end_index-1,[pa,t_end,[],1])
+                    for i in range(1,len(events)):
+                        events[i][2] = [x for x in events[i-1][2] if x not in nodes[events[i][0]]['children']]+[events[i][0]]
+                        if events[i][1] == events[i-1][1]:
+                            events[i-1][2].append(events[i][0])
+                        events[i][2] = list(set(events[i][2]))
+
+                else:
+                    ##In this case the parent of rewire is the root, so there's no grandpa
+
+                    otherchi = [x for x in nodes[pa]['children'] if x != rewire][0]
+                    if p_end == otherchi:
+                        nodes[pa]['time'] = t_end
+                        events[-1][1] = t_end
+                    else:
+                        nodes[otherchi]['parents'] = []
+                        nodes[pa]['parents'] = nodes[p_end]['parents']
+                        for x in nodes[p_end]['parents']:
+                            nodes[x]['children'] = [x for x in nodes[x]['children'] if x != p_end] + [pa]
+                        nodes[p_end]['parents'] = [pa]
+                        nodes[pa]['time'] = t_end
+                        nodes[pa]['children'] = [rewire,p_end]
+
+                        del events[timeindex(events,original_t)]
+                        if t_end < original_t:
+                            events.insert(end_index,[pa,t_end,[],1])
+                        else:
+                            events.insert(end_index-1,[pa,t_end,[],1])
+                        for i in range(1,len(events)):
+                            events[i][2] = [x for x in events[i-1][2] if x not in nodes[events[i][0]]['children']]+[events[i][0]]
+                            if events[i][1] == events[i-1][1]:
+                                events[i-1][2].append(events[i][0])
+                            events[i][2] = list(set(events[i][2]))
+                        
+            else:
+                ##In this case nodes strucute does not change, only the time order of events changes.
+
+                original_t = nodes[pa]['time']
+                nodes[pa]['time'] = t_end
+                del events[timeindex(events,original_t)]
+                if t_end < original_t:
+                    events.insert(end_index,[pa,t_end,[],1])
+                else:
+                    events.insert(end_index-1,[pa,t_end,[],1])
+                startindex = timeindex(events, t_start)
+                for i in range(startindex,len(events)):
+                        events[i][2] = [x for x in events[i-1][2] if x not in nodes[events[i][0]]['children']]+[events[i][0]]
+                        if events[i][1] == events[i-1][1]:
+                            events[i-1][2].append(events[i][0])
+                        events[i][2] = list(set(events[i][2]))
+
+        else:
+            ##In this case the root is changed to pa
+
+            p_end = events[-1][0]
+            pa = nodes[rewire]['parents']
+            otherchi = [x for x in nodes[pa]['children'] if x != rewire][0]
+
+            if p_end != pa:
+                ## that means pa must has one more parent
+
+                grandpa = nodes[pa]['parents']
+                original_t = nodes[pa]['time']
+                nodes[p_end]['parents'] = pa
+                nodes[pa]['time'] = t_end
+                nodes[pa]['parents'] = []
+                nodes[pa]['children'] = [p_end, rewire]
+                nodes[otherchi]['parents'] = grandpa
+                for x in grandpa:
+                    nodes[x]['children'] = [x for x in nodes[x]['children'] if x != pa] + [otherchi]
+                nodes[rewire]['parents'] = pa
+
+                startindex = timeindex(events, t_start)
+                events.insert(len(events),[pa,t_end,[pa],1])
+                del events[timeindex(events, original_t)]
+
+                for i in range(startindex,len(events)):
+                    events[i][2] = [x for x in events[i-1][2] if x not in nodes[events[i][0]]['children']]+[events[i][0]]
+                    if events[i][1] == events[i-1][1]:
+                        events[i-1][2].append(events[i][0])
+                    events[i][2] = list(set(events[i][2]))
+                
+                return nodes, events, forward_propose, backward_propose
+
+            else:
+                ## in this case we just update the root's time
+
+                events[-1][1] = t_end
+                nodes[p_end]['time'] = t_end
+                
+                return nodes, events, forward_propose, backward_propose
+
     else:
+        ##in this case, the branch is rewired downwards 
+        original_t = nodes[rewire]['time']
+        t_start = nodes[nodes[rewire]['parents'][0]]['time']
+        t_end = random.uniform(0, t_start)
+        end_index = timeindex(events, t_end)
+        if len(nodes[rewire]['children']) == 0:
+            ##in this case rewire has no children and we do nothing
+            forward_propose = 1
+            backward_propose = 1
+        else:
+            ##in this case rewire is a migration branch, we change its children
+            chi = nodes[rewire]['children'][0]
+            otherpa = [x for x in nodes[chi]['parents'] if x != rewire][0]
+            if p_end == otherpa or p_end == chi:
+                ##the nodes structure does not change in this case
+                nodes[otherpa]['time'] = t_end
+                nodes[rewire]['time'] = t_end
+                events = [x for x in events if x[0] not in [otherpa, rewire]]
+                if t_end < original_t:
+                    events.insert(end_index,[rewire,t_end,[],0])
+                    events.insert(end_index,[otherpa,t_end,[],0])
+                else:
+                    events.insert(end_index-2,[rewire,t_end,[],0])
+                    events.insert(end_index-2,[otherpa,t_end,[],0])
+                for i in range(1,len(events)):
+                    events[i][2] = [x for x in events[i-1][2] if x not in nodes[events[i][0]]['children']]+[events[i][0]]
+                    if events[i][1] == events[i-1][1]:
+                        events[i-1][2].append(events[i][0])
+                    events[i][2] = list(set(events[i][2]))
+            else:
+                ##rewired to some other branch downwards
+                dest_pa = nodes[p_end]['parents']
+
+                nodes[otherpa]['time'] = t_end
+                nodes[rewire]['time'] = t_end
+                grandpa = nodes[otherpa]['parents']
+                nodes[chi]['parents'] = grandpa
+                for x in grandpa:
+                    nodes[x]['children'] = [chi]
+                
+                nodes[otherpa]['parents'] = dest_pa
+                for x in dest_pa:
+                    nodes[x]['children'] = [otherpa]
+                nodes[rewire]['children'] = [p_end]
+                nodes[otherpa]['children'] = [p_end]
+                nodes[p_end]['parents'] = [rewire, otherpa]
+
+                events = [x for x in events if x[0] not in [rewire, otherpa]]
+                if t_end < original_t:
+                    events.insert(end_index,[rewire,t_end,[],0])
+                    events.insert(end_index,[otherpa,t_end,[],0])
+                else:
+                    events.insert(end_index-2,[rewire,t_end,[],0])
+                    events.insert(end_index-2,[otherpa,t_end,[],0])
+                for i in range(1,len(events)):
+                    events[i][2] = [x for x in events[i-1][2] if x not in nodes[events[i][0]]['children']]+[events[i][0]]
+                    if events[i][1] == events[i-1][1]:
+                        events[i-1][2].append(events[i][0])
+                    events[i][2] = list(set(events[i][2]))
 
     return nodes, events,forward_propose, backward_propose
-
 
 
 def prior_likelihood(events, rho):
@@ -309,7 +515,7 @@ def mig_rjmcmc(nodes, events):
     old_events = events.copy()
 
     l = [x for x in events if x[-1]==0]
-    ## n is the numer of migration events
+    ## n is the number of migration events
     n = l/2
 
     ## with probability 1/4 we add an events, 1/4 we remove an events, and 1/2 resample the coalescent
@@ -321,3 +527,14 @@ def mig_rjmcmc(nodes, events):
         else:
             nodes, events = mig_add(nodes, events)
     
+
+
+
+
+
+for i in range(2):
+    nodes, events = mig_add(nodes, events)
+nodes, events = popn_create()
+for i in range(100):
+    nodes, events, f, b = mig_resample(nodes, events)
+nodes
